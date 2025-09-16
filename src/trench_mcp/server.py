@@ -71,7 +71,6 @@ def get_current_time() -> str:
         return f"Error: {result['error']}"
     
     return f"""Current Time Information:
-- Simulation Time: {result.get('sim_time_s', 0):.1f} seconds
 - UTC Time: {result.get('current_time', 'Unknown')}
 - ISO Time: {result.get('current_time_iso', 'Unknown')}
 - Epoch Start: {result.get('epoch_utc', 'Unknown')}
@@ -99,8 +98,8 @@ def get_all_passes() -> str:
     output = f"All Passes ({total} total):\n"
     for i, p in enumerate(passes, 1):
         output += f"\nPass {i}:"
-        output += f"\n  - AOS: {p.get('aos_utc', 'Unknown')} ({p.get('aos_s', 0)}s)"
-        output += f"\n  - LOS: {p.get('los_utc', 'Unknown')} ({p.get('los_s', 0)}s)"
+        output += f"\n  - AOS: {p.get('aos_utc', 'Unknown')}"
+        output += f"\n  - LOS: {p.get('los_utc', 'Unknown')}"
         output += f"\n  - Duration: {p.get('duration_s', 0):.0f}s"
         output += f"\n  - Max Elevation: {p.get('max_elev_deg', 0)}°"
         output += f"\n  - Satellite: {p.get('sat_id', 'Unknown')}"
@@ -121,13 +120,14 @@ def get_next_pass() -> str:
     if result.get('pass') is None:
         return result.get('message', 'No upcoming passes')
     
+    p = result.get('pass')
     return f"""Next Pass:
-- AOS: {result.get('aos_utc', 'Unknown')}
-- LOS: {result.get('los_utc', 'Unknown')}
-- Duration: {result.get('duration_s', 0):.0f} seconds
-- Max Elevation: {result.get('max_elev_deg', 0)}°
-- Satellite: {result.get('sat_id', 'Unknown')}
-- Ground Station: {result.get('gs_id', 'Unknown')}
+- AOS: {p.get('aos_utc', 'Unknown')}
+- LOS: {p.get('los_utc', 'Unknown')}
+- Duration: {p.get('duration_s', 0):.0f} seconds
+- Max Elevation: {p.get('max_elev_deg', 0)}°
+- Satellite: {p.get('sat_id', 'Unknown')}
+- Ground Station: {p.get('gs_id', 'Unknown')}
 """
 
 @mcp.tool()
