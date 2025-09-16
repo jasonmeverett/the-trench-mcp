@@ -165,7 +165,7 @@ def get_current_pass() -> str:
 def wait_until_time(target_sim_time: float) -> str:
     """
     Wait until the simulation reaches a specific time (in seconds since epoch).
-    Polls the simulation every second until the target time is reached.
+    Polls the simulation every 0.1 seconds until the target time is reached.
     
     Args:
         target_sim_time: Target simulation time in seconds since epoch
@@ -183,7 +183,7 @@ def wait_until_time(target_sim_time: float) -> str:
         if current_sim_time >= target_sim_time:
             return f"Target time {target_sim_time}s reached! Current time: {current_sim_time:.1f}s"
         
-        time.sleep(1)  # Wait 1 second before checking again
+        time.sleep(0.1)  # Wait 0.1 seconds before checking again (as requested)
     
     return f"Timeout waiting for simulation time {target_sim_time}s"
 
@@ -264,6 +264,66 @@ def stop_downlink() -> str:
         return f"Error stopping downlink: {result['error']}"
     
     return f"Downlink stopped: {result.get('message', 'Success')}"
+
+@mcp.tool()
+def start_downlink_simple() -> str:
+    """
+    Start a data downlink session with default parameters (no arguments required).
+    Must be called during an active satellite pass.
+    """
+    result = make_api_request("POST", "/downlink/start")
+    if "error" in result:
+        return f"Error starting downlink: {result['error']}"
+    
+    if result.get('status') == 'success':
+        bitrate = result.get('bitrate_kbps', 'unknown')
+        return f"Downlink started successfully at {bitrate} kbps"
+    else:
+        return f"Failed to start downlink: {result.get('message', 'Unknown error')}"
+
+@mcp.tool()
+def stop_downlink_simple() -> str:
+    """
+    Stop the current data downlink session (no arguments required).
+    """
+    result = make_api_request("POST", "/downlink/stop")
+    if "error" in result:
+        return f"Error stopping downlink: {result['error']}"
+    
+    return f"Downlink stopped: {result.get('message', 'Success')}"
+
+@mcp.tool()
+def get_downlink_status() -> str:
+    """
+    Get current downlink status including whether we're downlinking and total data downloaded.
+    """
+    result = make_api_request("GET", "/downlink/status")
+    if "error" in result:
+        return f"Error: {result['error']}"
+    
+    status_lines = [
+        f"Downlinking: {'Yes' if result.get('downlinking') else 'No'}",
+        f"In Pass: {'Yes' if result.get('in_pass') else 'No'}",
+        f"Total Data Downloaded: {result.get('kb_downloaded_total', 0):.1f} KB",
+        f"Current Bitrate: {result.get('current_bitrate_kbps', 0)} kbps",
+        f"Simulation Time: {result.get('current_sim_time_s', 0):.1f}s"
+    ]
+    
+    if result.get('downlink_start_time_s') is not None:
+        status_lines.append(f"Downlink Started At: {result.get('downlink_start_time_s'):.1f}s")
+    
+    if result.get('pass_info'):
+        pass_info = result['pass_info']
+        status_lines.extend([
+            f"Current Pass:",
+            f"  - Satellite: {pass_info.get('sat_id', 'Unknown')}",
+            f"  - Ground Station: {pass_info.get('gs_id', 'Unknown')}",
+            f"  - AOS: {pass_info.get('aos_s', 0):.1f}s",
+            f"  - LOS: {pass_info.get('los_s', 0):.1f}s",
+            f"  - Time Remaining: {pass_info.get('time_remaining_s', 0):.1f}s"
+        ])
+    
+    return "\n".join(status_lines)
 
 # === GROUND STATION CONTROL TOOLS ===
 
