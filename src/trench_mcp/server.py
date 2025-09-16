@@ -156,14 +156,31 @@ def get_current_pass() -> str:
 # === TIMING AND WAITING TOOLS ===
 
 @mcp.tool()
-def wait_until_time(target_sim_time: float) -> str:
+def wait_until_time(target_time_iso: str) -> str:
     """
-    Wait until the simulation reaches a specific time (in seconds since epoch).
+    Wait until the simulation reaches a specific UTC time.
     Polls the simulation every 0.1 seconds until the target time is reached.
     
     Args:
-        target_sim_time: Target simulation time in seconds since epoch
+        target_time_iso: Target UTC time in ISO format (e.g., "2025-09-15T17:30:00Z")
     """
+    import datetime as dt
+    
+    try:
+        # Parse the target ISO time
+        if target_time_iso.endswith('Z'):
+            target_time_iso = target_time_iso[:-1] + '+00:00'
+        target_dt = dt.datetime.fromisoformat(target_time_iso)
+        
+        # Convert to UTC if not already
+        if target_dt.tzinfo is None:
+            target_dt = target_dt.replace(tzinfo=dt.timezone.utc)
+        else:
+            target_dt = target_dt.astimezone(dt.timezone.utc)
+            
+    except ValueError as e:
+        return f"Error parsing target time '{target_time_iso}': {str(e)}"
+    
     start_time = time.time()
     max_wait_seconds = 86400  # 1 day timeout
     
@@ -172,14 +189,34 @@ def wait_until_time(target_sim_time: float) -> str:
         if "error" in result:
             return f"Error checking time: {result['error']}"
         
-        current_sim_time = result.get('sim_time_s', 0)
+        current_time_iso = result.get('current_time_iso')
+        if not current_time_iso:
+            return "Error: No current_time_iso in API response"
         
-        if current_sim_time >= target_sim_time:
-            return f"Target time {target_sim_time}s reached! Current time: {current_sim_time:.1f}s"
+        try:
+            # Parse current simulation time
+            if current_time_iso.endswith('Z'):
+                current_time_iso_fixed = current_time_iso[:-1] + '+00:00'
+            else:
+                current_time_iso_fixed = current_time_iso
+            current_dt = dt.datetime.fromisoformat(current_time_iso_fixed)
+            
+            # Convert to UTC if not already
+            if current_dt.tzinfo is None:
+                current_dt = current_dt.replace(tzinfo=dt.timezone.utc)
+            else:
+                current_dt = current_dt.astimezone(dt.timezone.utc)
+            
+            # Check if we've reached the target time
+            if current_dt >= target_dt:
+                return f"Target time reached! Current UTC: {current_dt.isoformat()}Z, Target UTC: {target_dt.isoformat()}Z"
+                
+        except ValueError as e:
+            return f"Error parsing current time '{current_time_iso}': {str(e)}"
         
-        time.sleep(0.1)  # Wait 0.1 seconds before checking again (as requested)
+        time.sleep(0.1)  # Wait 0.1 seconds before checking again
     
-    return f"Timeout waiting for simulation time {target_sim_time}s"
+    return f"Timeout waiting for UTC time {target_dt.isoformat()}Z"
 
 
 # === DOWNLINK CONTROL TOOLS ===
