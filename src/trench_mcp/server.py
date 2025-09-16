@@ -62,26 +62,6 @@ def test_api_connection() -> str:
         return f"Connection test failed with exception: {str(e)}\n\nAPI URL: {TRENCH_API_URL}"
 
 @mcp.tool()
-def get_simulation_state() -> str:
-    """
-    Get the current simulation state including satellite telemetry and timing information.
-    Returns comprehensive state data including position, contact status, and simulation time.
-    """
-    result = make_api_request("GET", "/state")
-    if "error" in result:
-        return f"Error: {result['error']}"
-    
-    return f"""Simulation State:
-- Simulation Time: {result.get('sat', {}).get('sim_time_s', 0):.1f}s
-- Current Time: {result.get('sat', {}).get('current_time', 'Unknown')}
-- Clock Speed: {result.get('clock_speed', 1)}x
-- Satellite ID: {result.get('sat', {}).get('sat_id', 'Unknown')}
-- In Contact: {result.get('sat', {}).get('contact', {}).get('in_contact', False)}
-- Data Rate: {result.get('sat', {}).get('link', {}).get('kbps', 0)} kbps
-- Data Sent: {result.get('sat', {}).get('link', {}).get('kb_sent_session', 0)} KB
-"""
-
-@mcp.tool()
 def get_current_time() -> str:
     """
     Get the current simulation time and real-world UTC time.
@@ -97,17 +77,6 @@ def get_current_time() -> str:
 - Epoch Start: {result.get('epoch_utc', 'Unknown')}
 - Clock Speed: {result.get('clock_speed', 1)}x real-time
 """
-
-@mcp.tool()
-def restart_simulation() -> str:
-    """
-    Restart the simulation from the beginning, resetting all state to epoch time.
-    """
-    result = make_api_request("POST", "/restart")
-    if "error" in result:
-        return f"Error: {result['error']}"
-    
-    return f"Simulation restarted: {result.get('message', 'Success')}"
 
 # === PASS MANAGEMENT TOOLS ===
 
@@ -196,7 +165,7 @@ def wait_until_time(target_sim_time: float) -> str:
         target_sim_time: Target simulation time in seconds since epoch
     """
     start_time = time.time()
-    max_wait_seconds = 300  # 5 minute timeout
+    max_wait_seconds = 86400  # 1 day timeout
     
     while time.time() - start_time < max_wait_seconds:
         result = make_api_request("GET", "/time")
@@ -212,83 +181,8 @@ def wait_until_time(target_sim_time: float) -> str:
     
     return f"Timeout waiting for simulation time {target_sim_time}s"
 
-@mcp.tool()
-def wait_for_next_pass() -> str:
-    """
-    Wait until the next satellite pass begins (AOS).
-    Returns when a pass becomes active or if no passes are scheduled.
-    """
-    # First check if there's a next pass
-    next_pass_result = make_api_request("GET", "/passes/next")
-    if "error" in next_pass_result:
-        return f"Error: {next_pass_result['error']}"
-    
-    if next_pass_result.get('pass') is None:
-        return "No upcoming passes to wait for"
-    
-    # Wait for the pass to become active
-    start_time = time.time()
-    max_wait_seconds = 3600  # 1 hour timeout
-    
-    while time.time() - start_time < max_wait_seconds:
-        result = make_api_request("GET", "/passes/current")
-        if "error" in result:
-            return f"Error checking current pass: {result['error']}"
-        
-        if result.get('in_pass', False):
-            return f"Pass is now active! {result.get('sat_id', 'Satellite')} is in contact with {result.get('gs_id', 'ground station')}"
-        
-        time.sleep(2)  # Check every 2 seconds
-    
-    return "Timeout waiting for next pass to begin"
 
 # === DOWNLINK CONTROL TOOLS ===
-
-@mcp.tool()
-def start_downlink(kb_requested: float, max_minutes: float = 10.0) -> str:
-    """
-    Start a data downlink session during an active pass.
-    
-    Args:
-        kb_requested: Amount of data to download in kilobytes
-        max_minutes: Maximum duration for the downlink in minutes (default: 10)
-    """
-    # First check if we're in a pass
-    current_pass = make_api_request("GET", "/passes/current")
-    if not current_pass.get('in_pass', False):
-        return "Error: Cannot start downlink - no active pass"
-    
-    data = {
-        "sat_id": current_pass.get('sat_id', 'LEO-001'),
-        "kb": kb_requested,
-        "max_minutes": max_minutes
-    }
-    
-    result = make_api_request("POST", "/cmd/start_downlink", data)
-    if "error" in result:
-        return f"Error starting downlink: {result['error']}"
-    
-    if result.get('error'):
-        return f"Downlink failed: {result['error']}"
-    
-    return f"""Downlink Started:
-- Requested: {kb_requested} KB
-- Max Duration: {max_minutes} minutes  
-- Scheduled Start: {result.get('scheduled_start_s', 0):.1f}s
-- Scheduled Stop: {result.get('scheduled_stop_s', 0):.1f}s
-- Expected Data: {result.get('expected_kb', 0):.1f} KB
-"""
-
-@mcp.tool()
-def stop_downlink() -> str:
-    """
-    Stop the current data downlink session.
-    """
-    result = make_api_request("POST", "/cmd/stop_downlink")
-    if "error" in result:
-        return f"Error stopping downlink: {result['error']}"
-    
-    return f"Downlink stopped: {result.get('message', 'Success')}"
 
 @mcp.tool()
 def start_downlink_simple() -> str:
@@ -374,76 +268,6 @@ def get_ground_station_state(gs_id: str = "DEMO-GS") -> str:
 - Azimuth Error: {result.get('errors', {}).get('az_deg', 0):.1f}°
 - Elevation Error: {result.get('errors', {}).get('el_deg', 0):.1f}°
 """
-
-@mcp.tool()
-def point_antenna(azimuth: float, elevation: float, gs_id: str = "DEMO-GS") -> str:
-    """
-    Point the ground station antenna to specific azimuth and elevation angles.
-    
-    Args:
-        azimuth: Target azimuth angle in degrees (0-360)
-        elevation: Target elevation angle in degrees (0-90)
-        gs_id: Ground station ID (default: DEMO-GS)
-    """
-    data = {
-        "gs_id": gs_id,
-        "az_deg": azimuth,
-        "el_deg": elevation
-    }
-    
-    result = make_api_request("POST", "/gs/point_az_el", data)
-    if "error" in result:
-        return f"Error pointing antenna: {result['error']}"
-    
-    return f"Antenna pointed to Az: {azimuth}°, El: {elevation}°"
-
-@mcp.tool()
-def track_satellite(sat_id: str = "LEO-001", gs_id: str = "DEMO-GS") -> str:
-    """
-    Start tracking a satellite with the ground station antenna.
-    
-    Args:
-        sat_id: Satellite ID to track (default: LEO-001)
-        gs_id: Ground station ID (default: DEMO-GS)
-    """
-    data = {
-        "sat_id": sat_id,
-        "gs_id": gs_id
-    }
-    
-    result = make_api_request("POST", "/gs/track_sat_start", data)
-    if "error" in result:
-        return f"Error starting satellite tracking: {result['error']}"
-    
-    return f"Started tracking satellite {sat_id} with ground station {gs_id}"
-
-@mcp.tool()
-def stop_tracking(gs_id: str = "DEMO-GS") -> str:
-    """
-    Stop satellite tracking and return antenna to idle mode.
-    
-    Args:
-        gs_id: Ground station ID (default: DEMO-GS)
-    """
-    result = make_api_request("POST", f"/gs/track_stop?gs_id={gs_id}")
-    if "error" in result:
-        return f"Error stopping tracking: {result['error']}"
-    
-    return f"Stopped tracking for ground station {gs_id}"
-
-@mcp.tool()
-def park_antenna(gs_id: str = "DEMO-GS") -> str:
-    """
-    Park the ground station antenna in a safe position.
-    
-    Args:
-        gs_id: Ground station ID (default: DEMO-GS)
-    """
-    result = make_api_request("POST", f"/gs/park?gs_id={gs_id}")
-    if "error" in result:
-        return f"Error parking antenna: {result['error']}"
-    
-    return f"Antenna parked for ground station {gs_id}"
 
 # === HEALTH AND MONITORING TOOLS ===
 
