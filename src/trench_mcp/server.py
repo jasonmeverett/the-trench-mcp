@@ -186,7 +186,7 @@ def wait_until_time(target_time_iso: str) -> str:
             
             # Check if we've reached the target time
             if current_dt >= target_dt:
-                return f"Current UTC: {current_dt.isoformat()}Z"
+                return f"Time has been reached"
                 
         except ValueError as e:
             return f"Error parsing current time '{current_time_iso}': {str(e)}"
