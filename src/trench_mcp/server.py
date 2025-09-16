@@ -293,53 +293,6 @@ def stop_downlink_simple() -> str:
     
 #     return "\n".join(status_lines)
 
-# === GROUND STATION CONTROL TOOLS ===
-
-@mcp.tool()
-def get_ground_station_state(gs_id: str = "DEMO-GS") -> str:
-    """
-    Get the current state of the ground station antenna.
-    
-    Args:
-        gs_id: Ground station ID (default: DEMO-GS)
-    """
-    result = make_api_request("GET", f"/gs/state?gs_id={gs_id}")
-    if "error" in result:
-        return f"Error: {result['error']}"
-    
-    return f"""Ground Station State:
-- Azimuth: {result.get('az_deg', 0):.1f}°
-- Elevation: {result.get('el_deg', 0):.1f}°
-- Mode: {result.get('mode', 'Unknown')}
-- Target Type: {result.get('target', {}).get('type', 'Unknown')}
-- Target Azimuth: {result.get('target', {}).get('az_deg', 0):.1f}°
-- Target Elevation: {result.get('target', {}).get('el_deg', 0):.1f}°
-- Azimuth Error: {result.get('errors', {}).get('az_deg', 0):.1f}°
-- Elevation Error: {result.get('errors', {}).get('el_deg', 0):.1f}°
-"""
-
-# === HEALTH AND MONITORING TOOLS ===
-
-@mcp.tool()
-def get_satellite_health(sat_id: str = "LEO-001") -> str:
-    """
-    Get satellite health and telemetry information.
-    
-    Args:
-        sat_id: Satellite ID (default: LEO-001)
-    """
-    result = make_api_request("GET", f"/telemetry/health?sat_id={sat_id}")
-    if "error" in result:
-        return f"Error: {result['error']}"
-    
-    return f"""Satellite Health ({sat_id}):
-- Simulation Time: {result.get('sim_time_s', 0):.1f}s
-- Mode: {result.get('mode', 'Unknown')}
-- Battery: {result.get('battery_pct', 0)}%
-- Last Contact: {result.get('last_contact_s', 'Never')}
-"""
-
-
 def main():
     transport = os.getenv("MCP_TRANSPORT", "stdio")
     print(f"Starting Trench MCP Server via transport: {transport}")
