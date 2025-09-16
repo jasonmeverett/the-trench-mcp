@@ -30,11 +30,36 @@ def make_api_request(method: str, endpoint: str, data: Optional[Dict] = None) ->
             return {"error": f"Unsupported HTTP method: {method}"}
         
         response.raise_for_status()
-        return response.json()
+        
+        # Check if response has content before trying to parse JSON
+        if not response.content:
+            return {"error": f"Empty response from API endpoint {endpoint}"}
+        
+        try:
+            return response.json()
+        except ValueError as json_error:
+            return {"error": f"Invalid JSON response from {endpoint}: {str(json_error)}. Response content: {response.text[:200]}"}
+            
     except requests.exceptions.RequestException as e:
-        return {"error": f"API request failed: {str(e)}"}
+        return {"error": f"API request failed for {url}: {str(e)}"}
 
 # === SIMULATION STATE TOOLS ===
+
+@mcp.tool()
+def test_api_connection() -> str:
+    """
+    Test the connection to the Trench API server.
+    Useful for debugging connectivity issues.
+    """
+    try:
+        # Try a simple GET request to the time endpoint
+        result = make_api_request("GET", "/time")
+        if "error" in result:
+            return f"Connection test failed: {result['error']}\n\nAPI URL: {TRENCH_API_URL}\nAPI Key configured: {'Yes' if TRENCH_API_KEY else 'No'}"
+        else:
+            return f"Connection test successful!\n\nAPI URL: {TRENCH_API_URL}\nCurrent simulation time: {result.get('sim_time_s', 'unknown')}s\nClock speed: {result.get('clock_speed', 'unknown')}x"
+    except Exception as e:
+        return f"Connection test failed with exception: {str(e)}\n\nAPI URL: {TRENCH_API_URL}"
 
 @mcp.tool()
 def get_simulation_state() -> str:
