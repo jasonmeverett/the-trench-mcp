@@ -246,18 +246,6 @@ def stop_downlink_simple() -> str:
             f"- Downlink Duration: {duration:.1f}s"
         ])
     
-    if status_result.get('pass_info'):
-        pass_info = status_result['pass_info']
-        status_lines.extend([
-            "",
-            "Pass Information:",
-            f"- Satellite: {pass_info.get('sat_id', 'Unknown')}",
-            f"- Ground Station: {pass_info.get('gs_id', 'Unknown')}",
-            f"- AOS: {pass_info.get('aos_s', 0):.1f}s",
-            f"- LOS: {pass_info.get('los_s', 0):.1f}s",
-            f"- Time Remaining: {pass_info.get('time_remaining_s', 0):.1f}s"
-        ])
-    
     return "\n".join(status_lines)
 
 # @mcp.tool()
