@@ -9,6 +9,7 @@ dependencies = [
     "impyla>=0.21.0",
     "mcp[cli]>=1.9.4",
     "python-dotenv>=1.1.0",
+    "requests>=2.25.0",
 ]
 
 [dependency-groups]
