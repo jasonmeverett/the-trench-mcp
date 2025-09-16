@@ -130,29 +130,6 @@ def get_next_pass() -> str:
 - Ground Station: {p.get('gs_id', 'Unknown')}
 """
 
-@mcp.tool()
-def get_current_pass() -> str:
-    """
-    Get information about the currently active satellite pass.
-    Returns None if no pass is currently active.
-    """
-    result = make_api_request("GET", "/passes/current")
-    if "error" in result:
-        return f"Error: {result['error']}"
-    
-    if not result.get('in_pass', False):
-        return "No active pass currently"
-    
-    return f"""Current Active Pass:
-- AOS: {result.get('aos_utc', 'Unknown')}
-- LOS: {result.get('los_utc', 'Unknown')}
-- Duration: {result.get('duration_s', 0):.0f} seconds
-- Time Remaining: {result.get('time_remaining_s', 0):.0f} seconds
-- Max Elevation: {result.get('max_elev_deg', 0)}°
-- Satellite: {result.get('sat_id', 'Unknown')}
-- Ground Station: {result.get('gs_id', 'Unknown')}
-"""
-
 # === TIMING AND WAITING TOOLS ===
 
 @mcp.tool()
@@ -241,45 +218,80 @@ def start_downlink_simple() -> str:
 def stop_downlink_simple() -> str:
     """
     Stop the current data downlink session (no arguments required).
+    Returns complete downlink status including total data downloaded.
     """
-    result = make_api_request("POST", "/downlink/stop")
-    if "error" in result:
-        return f"Error stopping downlink: {result['error']}"
+    # Get current status before stopping
+    status_result = make_api_request("GET", "/downlink/status")
+    if "error" in status_result:
+        return f"Error getting downlink status: {status_result['error']}"
     
-    return f"Downlink stopped: {result.get('message', 'Success')}"
-
-@mcp.tool()
-def get_downlink_status() -> str:
-    """
-    Get current downlink status including whether we're downlinking and total data downloaded.
-    """
-    result = make_api_request("GET", "/downlink/status")
-    if "error" in result:
-        return f"Error: {result['error']}"
+    # Stop the downlink
+    stop_result = make_api_request("POST", "/downlink/stop")
+    if "error" in stop_result:
+        return f"Error stopping downlink: {stop_result['error']}"
     
+    # Build comprehensive status report
     status_lines = [
-        f"Downlinking: {'Yes' if result.get('downlinking') else 'No'}",
-        f"In Pass: {'Yes' if result.get('in_pass') else 'No'}",
-        f"Total Data Downloaded: {result.get('kb_downloaded_total', 0):.1f} KB",
-        f"Current Bitrate: {result.get('current_bitrate_kbps', 0)} kbps",
-        f"Simulation Time: {result.get('current_sim_time_s', 0):.1f}s"
+        f"Downlink stopped: {stop_result.get('message', 'Success')}",
+        "",
+        "Final Downlink Status:",
+        f"- Total Data Downloaded: {status_result.get('kb_downloaded_total', 0):.1f} KB",
+        f"- Final Bitrate: {status_result.get('current_bitrate_kbps', 0)} kbps",
+        f"- Was In Pass: {'Yes' if status_result.get('in_pass') else 'No'}"
     ]
     
-    if result.get('downlink_start_time_s') is not None:
-        status_lines.append(f"Downlink Started At: {result.get('downlink_start_time_s'):.1f}s")
-    
-    if result.get('pass_info'):
-        pass_info = result['pass_info']
+    if status_result.get('downlink_start_time_s') is not None:
+        duration = status_result.get('current_sim_time_s', 0) - status_result.get('downlink_start_time_s', 0)
         status_lines.extend([
-            f"Current Pass:",
-            f"  - Satellite: {pass_info.get('sat_id', 'Unknown')}",
-            f"  - Ground Station: {pass_info.get('gs_id', 'Unknown')}",
-            f"  - AOS: {pass_info.get('aos_s', 0):.1f}s",
-            f"  - LOS: {pass_info.get('los_s', 0):.1f}s",
-            f"  - Time Remaining: {pass_info.get('time_remaining_s', 0):.1f}s"
+            f"- Downlink Duration: {duration:.1f}s"
+        ])
+    
+    if status_result.get('pass_info'):
+        pass_info = status_result['pass_info']
+        status_lines.extend([
+            "",
+            "Pass Information:",
+            f"- Satellite: {pass_info.get('sat_id', 'Unknown')}",
+            f"- Ground Station: {pass_info.get('gs_id', 'Unknown')}",
+            f"- AOS: {pass_info.get('aos_s', 0):.1f}s",
+            f"- LOS: {pass_info.get('los_s', 0):.1f}s",
+            f"- Time Remaining: {pass_info.get('time_remaining_s', 0):.1f}s"
         ])
     
     return "\n".join(status_lines)
+
+# @mcp.tool()
+# def get_downlink_status() -> str:
+#     """
+#     Get current downlink status including whether we're downlinking and total data downloaded.
+#     """
+#     result = make_api_request("GET", "/downlink/status")
+#     if "error" in result:
+#         return f"Error: {result['error']}"
+    
+#     status_lines = [
+#         f"Downlinking: {'Yes' if result.get('downlinking') else 'No'}",
+#         f"In Pass: {'Yes' if result.get('in_pass') else 'No'}",
+#         f"Total Data Downloaded: {result.get('kb_downloaded_total', 0):.1f} KB",
+#         f"Current Bitrate: {result.get('current_bitrate_kbps', 0)} kbps",
+#         f"Simulation Time: {result.get('current_sim_time_s', 0):.1f}s"
+#     ]
+    
+#     if result.get('downlink_start_time_s') is not None:
+#         status_lines.append(f"Downlink Started At: {result.get('downlink_start_time_s'):.1f}s")
+    
+#     if result.get('pass_info'):
+#         pass_info = result['pass_info']
+#         status_lines.extend([
+#             f"Current Pass:",
+#             f"  - Satellite: {pass_info.get('sat_id', 'Unknown')}",
+#             f"  - Ground Station: {pass_info.get('gs_id', 'Unknown')}",
+#             f"  - AOS: {pass_info.get('aos_s', 0):.1f}s",
+#             f"  - LOS: {pass_info.get('los_s', 0):.1f}s",
+#             f"  - Time Remaining: {pass_info.get('time_remaining_s', 0):.1f}s"
+#         ])
+    
+#     return "\n".join(status_lines)
 
 # === GROUND STATION CONTROL TOOLS ===
 
