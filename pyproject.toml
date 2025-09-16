@@ -1,5 +1,5 @@
 [project]
-name = "trench-mcp-server"
+name = "trench-mcp"
 version = "0.1.0"
 description = "Trench MCP Server"
 readme = "README.md"
